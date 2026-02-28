@@ -1,0 +1,89 @@
+int val = 0;
+int va2 = 0;
+
+int baseSpeed = 100;  // normal speed
+int fastSpeed = 180;  // faster speed when sensor detects black
+
+void setup()
+{
+  Serial.begin(9600);       // sensor baud rate
+
+  // IR Sensors
+  pinMode(12, INPUT);       // Left IR sensor
+  pinMode(13, INPUT);       // Right IR sensor
+
+  // Motor A - Left
+  pinMode(8, OUTPUT);       // IN1
+  pinMode(7, OUTPUT);       // IN2
+  pinMode(9, OUTPUT);       // ENA (PWM speed)
+
+  // Motor B - Right
+  pinMode(5, OUTPUT);       // IN3
+  pinMode(4, OUTPUT);       // IN4
+  pinMode(3, OUTPUT);       // ENB (PWM speed)
+
+  // Initialize motors at base speed
+  analogWrite(9, baseSpeed);
+  analogWrite(3, baseSpeed);
+}
+
+void loop()
+{
+  val = digitalRead(13);    // Right IR sensor
+  va2 = digitalRead(12);    // Left IR sensor
+
+  Serial.print("Right(13): ");
+  Serial.print(val);
+  Serial.print("  Left(12): ");
+  Serial.println(va2);
+
+  delay(10);
+
+  // ── FORWARD: both sensors detect BLACK ───────────────
+  if (val == 0 && va2 == 0)
+  {
+    analogWrite(9, baseSpeed);   // Left motor
+    analogWrite(3, baseSpeed);   // Right motor
+
+    digitalWrite(8, HIGH);  // Left forward
+    digitalWrite(7, LOW);
+    digitalWrite(5, HIGH);  // Right forward
+    digitalWrite(4, LOW);
+  }
+
+  // ── RIGHT SENSOR BLACK: increase right motor ─────────
+  else if (val == 0 && va2 == 1)
+  {
+    analogWrite(9, baseSpeed);   // Left normal
+    analogWrite(3, fastSpeed);   // Right faster
+
+    digitalWrite(8, HIGH);  // Left forward
+    digitalWrite(7, LOW);
+    digitalWrite(5, LOW);  // Right forward
+    digitalWrite(4, HIGH);
+  }
+
+  // ── LEFT SENSOR BLACK: increase left motor ──────────
+  else if (val == 1 && va2 == 0)
+  {
+    analogWrite(9, fastSpeed);   // Left faster
+    analogWrite(3, baseSpeed);   // Right normal
+
+    digitalWrite(8, LOW);  // Left forward
+    digitalWrite(7, HIGH);
+    digitalWrite(5, HIGH);  // Right forward
+    digitalWrite(4, LOW);
+  }
+
+  // ── STOP: both sensors detect WHITE ──────────────────
+  else if (val == 1 && va2 == 1)
+  {
+    analogWrite(9, 0);  // stop left
+    analogWrite(3, 0);  // stop right
+
+    digitalWrite(8, LOW);
+    digitalWrite(7, LOW);
+    digitalWrite(5, LOW);
+    digitalWrite(4, LOW);
+  }
+}
