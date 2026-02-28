@@ -1,0 +1,179 @@
+#include <Arduino.h>
+
+void right_forward();
+void left_forward();
+void right_backward();
+void left_backward();
+void stop();
+void right_scan();
+void left_scan();
+void move_right();
+void move_left();
+int read_right_ir();
+int read_left_ir();
+
+int right_ir = 0;
+int left_ir = 0;
+
+int BlackLine = 0;
+int WhiteLine = 1;
+
+int left_ir_sensor = 12;
+int right_ir_sensor = 13;
+
+int in1 = 8;
+int in2 = 7;
+int in3 = 5;
+int in4 = 4;
+
+int left_motor = 9;
+int right_motor = right_motor;
+
+int slowSpeed = 70;
+int baseSpeed = 100;  // normal speed
+int fastSpeed = 180;  // faster speed when sensor detects black
+
+void setup()
+{
+  Serial.begin(9600);       // sensor baud rate
+
+  // IR Sensors
+  pinMode(12, INPUT);       // Left IR sensor
+  pinMode(13, INPUT);       // Right IR sensor
+
+  // Motor A - Left
+  pinMode(in1, OUTPUT);       // IN1
+  pinMode(in2, OUTPUT);       // IN2
+  pinMode(left_motor, OUTPUT);       // ENA (PWM speed)
+
+  // Motor B - Right
+  pinMode(in3, OUTPUT);       // IN3
+  pinMode(in4, OUTPUT);       // IN4
+  pinMode(right_motor, OUTPUT);       // ENB (PWM speed)
+
+  // Initialize motors at base speed
+  analogWrite(left_motor, baseSpeed);
+  analogWrite(right_motor, baseSpeed);
+}
+
+void loop()
+{
+  right_ir = digitalRead(13);    // Right IR sensor
+  left_ir = digitalRead(12);    // Left IR sensor
+
+  Serial.print("Right(13): ");
+  Serial.print(right_ir);
+  Serial.print("  Left(12): ");
+  Serial.println(left_ir);
+
+  delay(10);
+
+  // ── FORWARD: both sensors detect BLACK ───────────────
+  if (right_ir == 0 && left_ir == 0)
+  {
+    analogWrite(left_motor, baseSpeed);   // Left motor
+    analogWrite(right_motor, baseSpeed);   // Right motor
+
+    left_forward();
+    right_forward();
+
+  }
+
+  // ── RIGHT SENSOR BLACK: increase right motor ─────────
+  else if (right_ir == 0 && left_ir == 1)
+  {
+    analogWrite(left_motor, fastSpeed);   // Left normal
+    analogWrite(right_motor, baseSpeed);   // Right faster
+
+    left_forward();
+    right_backward();
+
+  }
+
+  // ── LEFT SENSOR BLACK: increase left motor ──────────
+  else if (right_ir == 1 && left_ir == 0)
+  {
+    analogWrite(left_motor, baseSpeed);   // Left faster
+    analogWrite(right_motor, fastSpeed);   // Right normal
+
+    left_backward();
+    right_forward();
+  }
+
+  // ── STOP: both sensors detect WHITE ──────────────────
+  else if (right_ir == 1 && left_ir == 1)
+  {
+
+    left_scan();
+
+    if(read_right_ir == 0)
+      move_right();
+    else if(read_left_ir == 0)
+      move_left();
+    else
+
+      right_scan();
+    if(read_left_ir == 0)
+      move_left();
+    else if(read_right_ir == 0)
+      move_right();
+    
+
+  }
+}
+
+void right_scan(){
+  move_right();
+  stop();
+  left_forward();
+  right_forward();
+
+}
+
+void left_scan(){
+  right_forward();
+  stop();
+  left_forward();
+  right_forward();
+}
+
+int read_right_ir(){
+  return digitalRead(13);
+}
+
+int read_left_ir(){
+  return digitalRead(12);
+}
+
+void left_forward(){
+   digitalWrite(in1, HIGH);  // Left forward
+   digitalWrite(in2, LOW);
+}
+
+void left_backward(){
+    digitalWrite(in1, LOW);  // Left forward
+    digitalWrite(in2, HIGH);
+}
+
+void right_forward(){
+    digitalWrite(in3, HIGH);  // Right forward
+    digitalWrite(in4, LOW);
+}
+
+void right_backward(){
+    digitalWrite(in3, LOW);  // Right forward
+    digitalWrite(in4, HIGH);
+}
+
+void stop(){
+    digitalWrite(in1, LOW);  // Left forward
+    digitalWrite(in2, LOW);
+
+    digitalWrite(in3, LOW);  // Right forward
+    digitalWrite(in4, LOW);
+}
+
+void move_right(){
+  left_forward();
+  right_backward();
+}
