@@ -1,0 +1,173 @@
+int val  = 0;  // Right sensor  (13)
+int va2  = 0;  // Left sensor   (12)
+int va3  = 0;  // Middle sensor (11)
+
+int baseSpeed = 120;  // ← slightly faster for stability
+int turnSpeed = 150;
+
+unsigned long lostTime = 0;
+int lastTurn = 0;
+
+void setup()
+{
+  Serial.begin(9600);
+
+  pinMode(13, INPUT);
+  pinMode(12, INPUT);
+  pinMode(11, INPUT);
+
+  pinMode(8, OUTPUT);
+  pinMode(7, OUTPUT);
+  pinMode(9, OUTPUT);
+
+  pinMode(5, OUTPUT);
+  pinMode(4, OUTPUT);
+  pinMode(3, OUTPUT);
+
+  analogWrite(9, baseSpeed);
+  analogWrite(3, baseSpeed);
+}
+
+// ── DRIVE HELPERS ─────────────────────────────────────
+// Always forward, just vary speeds
+void goStraight() {
+  analogWrite(9, baseSpeed); analogWrite(3, baseSpeed);
+  digitalWrite(8, HIGH); digitalWrite(7, LOW);
+  digitalWrite(5, HIGH); digitalWrite(4, LOW);
+}
+
+// Soft curve - slow down ONE side, never reverse
+void curveLeft() {
+  analogWrite(9, 60);         // Left slows down
+  analogWrite(3, baseSpeed);  // Right stays
+  digitalWrite(8, HIGH); digitalWrite(7, LOW);
+  digitalWrite(5, HIGH); digitalWrite(4, LOW);
+}
+
+void curveRight() {
+  analogWrite(9, baseSpeed);  // Left stays
+  analogWrite(3, 60);         // Right slows down
+  digitalWrite(8, HIGH); digitalWrite(7, LOW);
+  digitalWrite(5, HIGH); digitalWrite(4, LOW);
+}
+
+// Sharp turn - one wheel stops, other goes forward
+void sharpLeft() {
+  analogWrite(9, 0);
+  analogWrite(3, turnSpeed);
+  digitalWrite(8, LOW);  digitalWrite(7, LOW);   // Left stop
+  digitalWrite(5, HIGH); digitalWrite(4, LOW);   // Right forward
+  lastTurn = -1;
+}
+
+void sharpRight() {
+  analogWrite(9, turnSpeed);
+  analogWrite(3, 0);
+  digitalWrite(8, HIGH); digitalWrite(7, LOW);   // Left forward
+  digitalWrite(5, LOW);  digitalWrite(4, LOW);   // Right stop
+  lastTurn = 1;
+}
+
+void stopAll() {
+  analogWrite(9, 0); analogWrite(3, 0);
+  digitalWrite(8, LOW); digitalWrite(7, LOW);
+  digitalWrite(5, LOW); digitalWrite(4, LOW);
+}
+
+void loop()
+{
+  val = digitalRead(13);   // Right
+  va2 = digitalRead(12);   // Left
+  va3 = digitalRead(11);   // Middle
+
+  Serial.print("R:"); Serial.print(val);
+  Serial.print(" L:"); Serial.print(va2);
+  Serial.print(" M:"); Serial.println(va3);
+
+  delay(8);
+
+  // ── ALL 3 ON BLACK: straight ──────────────────────────
+  if (val == 0 && va2 == 0 && va3 == 0)
+  {
+    goStraight();
+    lostTime = 0;
+  }
+
+  // ── ONLY MIDDLE: straight ─────────────────────────────
+  else if (val == 1 && va2 == 1 && va3 == 0)
+  {
+    goStraight();
+    lostTime = 0;
+  }
+
+  // ── MIDDLE + RIGHT (drifting left): soft curve right ──
+  else if (val == 0 && va2 == 1 && va3 == 0)
+  {
+    curveRight();
+    lastTurn = 1;
+    lostTime = 0;
+  }
+
+  // ── MIDDLE + LEFT (drifting right): soft curve left ───
+  else if (val == 1 && va2 == 0 && va3 == 0)
+  {
+    curveLeft();
+    lastTurn = -1;
+    lostTime = 0;
+  }
+
+  // ── ONLY RIGHT: sharp right turn ──────────────────────
+  else if (val == 0 && va2 == 1 && va3 == 1)
+  {
+    sharpRight();
+    lostTime = 0;
+  }
+
+  // ── ONLY LEFT: sharp left turn ────────────────────────
+  else if (val == 1 && va2 == 0 && va3 == 1)
+  {
+    sharpLeft();
+    lostTime = 0;
+  }
+
+  // ── LEFT + RIGHT NO MIDDLE: intersection ──────────────
+  else if (val == 0 && va2 == 0 && va3 == 1)
+  {
+    goStraight();
+    lostTime = 0;
+  }
+
+  // ── ALL WHITE: lost ────────────────────────────────────
+  else if (val == 1 && va2 == 1 && va3 == 1)
+  {
+    if (lostTime == 0) lostTime = millis();
+    unsigned long lost = millis() - lostTime;
+
+    // Phase 1: coast forward (dashed gap)
+    if (lost < 300)
+    {
+      goStraight();
+    }
+
+    // Phase 2: slow spin toward last turn
+    else if (lost < 1000)
+    {
+      if (lastTurn == 1)  sharpRight();
+      else                sharpLeft();
+    }
+
+    // Phase 3: slow spin other way
+    else if (lost < 2000)
+    {
+      if (lastTurn == 1)  sharpLeft();
+      else                sharpRight();
+    }
+
+    // Phase 4: stop and wait
+    else
+    {
+      stopAll();
+      if (lost > 4000) lostTime = 0;  // retry after 2s
+    }
+  }
+}
