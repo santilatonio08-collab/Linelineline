@@ -1,0 +1,102 @@
+#define IR_SENSOR_RIGHT 13   // was 11
+#define IR_SENSOR_LEFT 12
+#define MOTOR_SPEED 178
+#define TURN_SPEED 185
+
+// 🔧 RIGHT MOTOR (matches first code)
+int enableRightMotor = 3;   // ENB
+int rightMotorPin1 = 5;     // IN3
+int rightMotorPin2 = 4;     // IN4
+
+// 🔧 LEFT MOTOR (matches first code)
+int enableLeftMotor = 9;    // ENA
+int leftMotorPin1 = 8;      // IN1
+int leftMotorPin2 = 7;      // IN2
+
+void rotateMotor(int rightMotorSpeed, int leftMotorSpeed);
+
+void setup()
+{
+  TCCR0B = TCCR0B & B11111000 | B00000010;
+
+  pinMode(enableRightMotor, OUTPUT);
+  pinMode(rightMotorPin1, OUTPUT);
+  pinMode(rightMotorPin2, OUTPUT);
+
+  pinMode(enableLeftMotor, OUTPUT);
+  pinMode(leftMotorPin1, OUTPUT);
+  pinMode(leftMotorPin2, OUTPUT);
+
+  pinMode(IR_SENSOR_RIGHT, INPUT);
+  pinMode(IR_SENSOR_LEFT, INPUT);
+
+  rotateMotor(0, 0);
+}
+
+void loop()
+{
+  int rightIR = digitalRead(IR_SENSOR_RIGHT);
+  int leftIR  = digitalRead(IR_SENSOR_LEFT);
+
+  // LOW = white
+  // HIGH = black
+
+  if (rightIR == LOW && leftIR == LOW)
+  {
+    rotateMotor(MOTOR_SPEED, MOTOR_SPEED);
+  }
+  else if (rightIR == HIGH && leftIR == HIGH)
+  {
+    rotateMotor(MOTOR_SPEED, MOTOR_SPEED);
+  }
+  else if (leftIR == LOW && rightIR == HIGH)
+  {
+    rotateMotor(TURN_SPEED, -MOTOR_SPEED);
+    delay(50);
+  } 
+  else if (rightIR == LOW && leftIR == HIGH)
+  {
+    rotateMotor(-MOTOR_SPEED, TURN_SPEED);
+    delay(50);
+  }
+}
+
+void rotateMotor(int rightMotorSpeed, int leftMotorSpeed)
+{
+  // RIGHT MOTOR
+  if (rightMotorSpeed > 0)
+  {
+    digitalWrite(rightMotorPin1, HIGH);
+    digitalWrite(rightMotorPin2, LOW);
+  }
+  else if (rightMotorSpeed < 0)
+  {
+    digitalWrite(rightMotorPin1, LOW);
+    digitalWrite(rightMotorPin2, HIGH);
+  }
+  else
+  {
+    digitalWrite(rightMotorPin1, LOW);
+    digitalWrite(rightMotorPin2, LOW);
+  }
+
+  // LEFT MOTOR
+  if (leftMotorSpeed > 0)
+  {
+    digitalWrite(leftMotorPin1, HIGH);
+    digitalWrite(leftMotorPin2, LOW);
+  }
+  else if (leftMotorSpeed < 0)
+  {
+    digitalWrite(leftMotorPin1, LOW);
+    digitalWrite(leftMotorPin2, HIGH);
+  }
+  else
+  {
+    digitalWrite(leftMotorPin1, LOW);
+    digitalWrite(leftMotorPin2, LOW);
+  }
+
+  analogWrite(enableRightMotor, abs(rightMotorSpeed));
+  analogWrite(enableLeftMotor, abs(leftMotorSpeed));
+}
