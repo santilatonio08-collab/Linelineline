@@ -1,0 +1,117 @@
+int val  = 0;  // Right sensor  (13)
+int va2  = 0;  // Left sensor   (12)
+int va3  = 0;  // Middle sensor (11)
+
+int baseSpeed = 100;
+int fastSpeed = 180;
+int turnSpeed = 150;
+
+void setup()
+{
+  Serial.begin(9600);
+
+  // IR Sensors
+  pinMode(13, INPUT);   // Right
+  pinMode(12, INPUT);   // Left
+  pinMode(11, INPUT);   // Middle ← NEW
+
+  // Motor A - Left
+  pinMode(8, OUTPUT);   // IN1
+  pinMode(7, OUTPUT);   // IN2
+  pinMode(9, OUTPUT);   // ENA
+
+  // Motor B - Right
+  pinMode(5, OUTPUT);   // IN3
+  pinMode(4, OUTPUT);   // IN4
+  pinMode(3, OUTPUT);   // ENB
+
+  analogWrite(9, baseSpeed);
+  analogWrite(3, baseSpeed);
+}
+
+void loop()
+{
+  val = digitalRead(13);   // Right
+  va2 = digitalRead(12);   // Left
+  va3 = digitalRead(11);   // Middle
+
+  Serial.print("R(13):"); Serial.print(val);
+  Serial.print(" L(12):"); Serial.print(va2);
+  Serial.print(" M(11):"); Serial.println(va3);
+
+  delay(8);
+
+  // ── ALL 3 ON BLACK: go straight ──────────────────────
+  if (val == 0 && va2 == 0 && va3 == 0)
+  {
+    analogWrite(9, baseSpeed);
+    analogWrite(3, baseSpeed);
+    digitalWrite(8, HIGH); digitalWrite(7, LOW);   // Left forward
+    digitalWrite(5, HIGH); digitalWrite(4, LOW);   // Right forward
+  }
+
+  // ── MIDDLE + LEFT ON BLACK: veer left ────────────────
+  else if (val == 1 && va2 == 0 && va3 == 0)
+  {
+    analogWrite(9, fastSpeed);
+    analogWrite(3, baseSpeed);
+    digitalWrite(8, LOW);  digitalWrite(7, HIGH);  // Left backward
+    digitalWrite(5, HIGH); digitalWrite(4, LOW);   // Right forward
+  }
+
+  // ── MIDDLE + RIGHT ON BLACK: veer right ──────────────
+  else if (val == 0 && va2 == 1 && va3 == 0)
+  {
+    analogWrite(9, baseSpeed);
+    analogWrite(3, fastSpeed);
+    digitalWrite(8, HIGH); digitalWrite(7, LOW);   // Left forward
+    digitalWrite(5, LOW);  digitalWrite(4, HIGH);  // Right backward
+  }
+
+  // ── ONLY MIDDLE ON BLACK: go straight ────────────────
+  else if (val == 1 && va2 == 1 && va3 == 0)
+  {
+    analogWrite(9, baseSpeed);
+    analogWrite(3, baseSpeed);
+    digitalWrite(8, HIGH); digitalWrite(7, LOW);   // Left forward
+    digitalWrite(5, HIGH); digitalWrite(4, LOW);   // Right forward
+  }
+
+  // ── ONLY RIGHT ON BLACK: turn right ──────────────────
+  else if (val == 0 && va2 == 1 && va3 == 1)
+  {
+    analogWrite(9, baseSpeed);
+    analogWrite(3, fastSpeed);
+    digitalWrite(8, HIGH); digitalWrite(7, LOW);   // Left forward
+    digitalWrite(5, LOW);  digitalWrite(4, HIGH);  // Right backward
+  }
+
+  // ── ONLY LEFT ON BLACK: turn left ────────────────────
+  else if (val == 1 && va2 == 0 && va3 == 1)
+  {
+    analogWrite(9, fastSpeed);
+    analogWrite(3, baseSpeed);
+    digitalWrite(8, LOW);  digitalWrite(7, HIGH);  // Left backward
+    digitalWrite(5, HIGH); digitalWrite(4, LOW);   // Right forward
+  }
+
+  // ── LEFT + RIGHT ON BLACK (no middle): intersection ──
+  // Middle lost the line - go straight and let it reacquire
+  else if (val == 0 && va2 == 0 && va3 == 1)
+  {
+    analogWrite(9, baseSpeed);
+    analogWrite(3, baseSpeed);
+    digitalWrite(8, HIGH); digitalWrite(7, LOW);
+    digitalWrite(5, HIGH); digitalWrite(4, LOW);
+  }
+
+  // ── ALL WHITE: lost - scan using last direction ───────
+  else if (val == 1 && va2 == 1 && va3 == 1)
+  {
+    // Slow spin right to search
+    analogWrite(9, turnSpeed);
+    analogWrite(3, turnSpeed);
+    digitalWrite(8, HIGH); digitalWrite(7, LOW);   // Left forward
+    digitalWrite(5, LOW);  digitalWrite(4, HIGH);  // Right backward
+  }
+}
