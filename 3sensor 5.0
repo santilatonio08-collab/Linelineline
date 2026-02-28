@@ -1,0 +1,98 @@
+int left = 0;
+int center = 0;
+int right = 0;
+
+int baseSpeed  = 100;
+int fastSpeed  = 180;
+int turnSpeed  = 220;   // hard turn when only one outer sensor sees the line
+
+void setup()
+{
+  Serial.begin(9600);
+
+  // IR Sensors
+  pinMode(12, INPUT);   // Left   IR sensor
+  pinMode(11, INPUT);   // Center IR sensor
+  pinMode(13, INPUT);   // Right  IR sensor
+
+  // Motor A - Left
+  pinMode(8, OUTPUT);   // IN1
+  pinMode(7, OUTPUT);   // IN2
+  pinMode(9, OUTPUT);   // ENA (PWM)
+
+  // Motor B - Right
+  pinMode(5, OUTPUT);   // IN3
+  pinMode(4, OUTPUT);   // IN4
+  pinMode(3, OUTPUT);   // ENB (PWM)
+
+  analogWrite(9, baseSpeed);
+  analogWrite(3, baseSpeed);
+}
+
+void loop()
+{
+  right  = digitalRead(13);   // 0 = BLACK (on line), 1 = WHITE (off line)
+  center = digitalRead(11);
+  left   = digitalRead(12);
+
+  Serial.print("L:"); Serial.print(left);
+  Serial.print(" C:"); Serial.print(center);
+  Serial.print(" R:"); Serial.println(right);
+
+  delay(10);
+
+  // ── STRAIGHT: center on line (with or without outer sensors) ──
+  if (center == 0)
+  {
+    analogWrite(9, baseSpeed);
+    analogWrite(3, baseSpeed);
+    digitalWrite(8, HIGH); digitalWrite(7, LOW);   // Left  forward
+    digitalWrite(5, HIGH); digitalWrite(4, LOW);   // Right forward
+  }
+
+  // ── SOFT LEFT: only right sensor on line ──────────────────────
+  else if (right == 0 && center == 1 && left == 1)
+  {
+    analogWrite(9, baseSpeed);   // Left  normal
+    analogWrite(3, fastSpeed);   // Right faster  → steers left
+    digitalWrite(8, HIGH); digitalWrite(7, LOW);
+    digitalWrite(5, HIGH); digitalWrite(4, LOW);
+  }
+
+  // ── SOFT RIGHT: only left sensor on line ──────────────────────
+  else if (left == 0 && center == 1 && right == 1)
+  {
+    analogWrite(9, fastSpeed);   // Left  faster  → steers right
+    analogWrite(3, baseSpeed);   // Right normal
+    digitalWrite(8, HIGH); digitalWrite(7, LOW);
+    digitalWrite(5, HIGH); digitalWrite(4, LOW);
+  }
+
+  // ── HARD LEFT: right + center off, left on ────────────────────
+  else if (left == 0 && center == 1 && right == 0)
+  {
+    // Ambiguous — treat as slight left bias (right leads)
+    analogWrite(9, baseSpeed);
+    analogWrite(3, turnSpeed);
+    digitalWrite(8, HIGH); digitalWrite(7, LOW);
+    digitalWrite(5, HIGH); digitalWrite(4, LOW);
+  }
+
+  // ── ALL ON LINE: intersection / straight ──────────────────────
+  else if (left == 0 && center == 0 && right == 0)
+  {
+    analogWrite(9, baseSpeed);
+    analogWrite(3, baseSpeed);
+    digitalWrite(8, HIGH); digitalWrite(7, LOW);
+    digitalWrite(5, HIGH); digitalWrite(4, LOW);
+  }
+
+  // ── STOP: all sensors off line ────────────────────────────────
+  else
+  {
+    analogWrite(9, 0);
+    analogWrite(3, 0);
+    digitalWrite(8, LOW); digitalWrite(7, LOW);
+    digitalWrite(5, LOW); digitalWrite(4, LOW);
+  }
+}
