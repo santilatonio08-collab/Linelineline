@@ -1,0 +1,167 @@
+int val = 0;
+int va2 = 0;
+int vc  = 0;
+
+int baseSpeed = 100;
+int fastSpeed = 180;
+int scanSpeed = 130;  // speed used during scanning rotation
+
+void setup()
+{
+  Serial.begin(9600);
+
+  // IR Sensors
+  pinMode(12, INPUT);   // Left  IR sensor
+  pinMode(11, INPUT);   // Center IR sensor
+  pinMode(13, INPUT);   // Right IR sensor
+
+  // Motor A - Left
+  pinMode(8, OUTPUT);   // IN1
+  pinMode(7, OUTPUT);   // IN2
+  pinMode(9, OUTPUT);   // ENA (PWM)
+
+  // Motor B - Right
+  pinMode(5, OUTPUT);   // IN3
+  pinMode(4, OUTPUT);   // IN4
+  pinMode(3, OUTPUT);   // ENB (PWM)
+
+  analogWrite(9, baseSpeed);
+  analogWrite(3, baseSpeed);
+}
+
+// ── Helper: rotate LEFT in place ─────────────────────────────────
+void scanLeft()
+{
+  analogWrite(9, scanSpeed);
+  analogWrite(3, scanSpeed);
+  digitalWrite(8, LOW);  digitalWrite(7, HIGH);  // Left  backward
+  digitalWrite(5, HIGH); digitalWrite(4, LOW);   // Right forward
+}
+
+// ── Helper: rotate RIGHT in place ────────────────────────────────
+void scanRight()
+{
+  analogWrite(9, scanSpeed);
+  analogWrite(3, scanSpeed);
+  digitalWrite(8, HIGH); digitalWrite(7, LOW);   // Left  forward
+  digitalWrite(5, LOW);  digitalWrite(4, HIGH);  // Right backward
+}
+
+// ── Helper: stop all motors ───────────────────────────────────────
+void stopMotors()
+{
+  analogWrite(9, 0);
+  analogWrite(3, 0);
+  digitalWrite(8, LOW); digitalWrite(7, LOW);
+  digitalWrite(5, LOW); digitalWrite(4, LOW);
+}
+
+// ── Scan left-to-right until a side sensor finds the line ─────────
+void scanForLine()
+{
+  // --- Phase 1: sweep LEFT first ---
+  unsigned long startTime = millis();
+  while (millis() - startTime < 400)   // rotate left up to 400 ms
+  {
+    val = digitalRead(13);
+    va2 = digitalRead(12);
+    vc  = digitalRead(11);
+
+    if (vc == 0 || val == 0 || va2 == 0)   // any sensor back on line
+    {
+      stopMotors();
+      return;
+    }
+    scanLeft();
+  }
+
+  // --- Phase 2: swing back RIGHT (double window to cross centre) ---
+  startTime = millis();
+  while (millis() - startTime < 800)   // rotate right up to 800 ms
+  {
+    val = digitalRead(13);
+    va2 = digitalRead(12);
+    vc  = digitalRead(11);
+
+    if (vc == 0 || val == 0 || va2 == 0)
+    {
+      stopMotors();
+      return;
+    }
+    scanRight();
+  }
+
+  // --- Phase 3: sweep LEFT again back to centre ---
+  startTime = millis();
+  while (millis() - startTime < 400)
+  {
+    val = digitalRead(13);
+    va2 = digitalRead(12);
+    vc  = digitalRead(11);
+
+    if (vc == 0 || val == 0 || va2 == 0)
+    {
+      stopMotors();
+      return;
+    }
+    scanLeft();
+  }
+
+  // Line not found — full stop
+  stopMotors();
+}
+
+void loop()
+{
+  val = digitalRead(13);   // Right  sensor
+  va2 = digitalRead(12);   // Left   sensor
+  vc  = digitalRead(11);   // Center sensor
+
+  Serial.print("L:"); Serial.print(va2);
+  Serial.print(" C:"); Serial.print(vc);
+  Serial.print(" R:"); Serial.println(val);
+
+  delay(10);
+
+  // ── CENTER WHITE: lost the line → scan ───────────────────────
+  if (vc == 1)
+  {
+    stopMotors();
+    delay(80);          // brief pause before scanning
+    scanForLine();
+    return;             // re-evaluate sensors next loop
+  }
+
+  // ── FORWARD: center (and both sides) on line ─────────────────
+  if (val == 0 && va2 == 0)
+  {
+    analogWrite(9, baseSpeed);
+    analogWrite(3, baseSpeed);
+    digitalWrite(8, HIGH); digitalWrite(7, LOW);
+    digitalWrite(5, HIGH); digitalWrite(4, LOW);
+  }
+
+  // ── STEER LEFT: right side on line, left off ─────────────────
+  else if (val == 0 && va2 == 1)
+  {
+    analogWrite(9, baseSpeed);
+    analogWrite(3, fastSpeed);
+    digitalWrite(8, HIGH); digitalWrite(7, LOW);
+    digitalWrite(5, LOW);  digitalWrite(4, HIGH);
+  }
+
+  // ── STEER RIGHT: left side on line, right off ────────────────
+  else if (val == 1 && va2 == 0)
+  {
+    analogWrite(9, fastSpeed);
+    analogWrite(3, baseSpeed);
+    digitalWrite(8, LOW);  digitalWrite(7, HIGH);
+    digitalWrite(5, HIGH); digitalWrite(4, LOW);
+  }
+
+  // ── STOP: all sensors white (fully off track) ─────────────────
+  else
+  {
+    stopMotors();
+  }
+}
